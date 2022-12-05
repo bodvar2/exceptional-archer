@@ -14,13 +14,23 @@ window.onload = function() {
     });
 
     canvas.addEventListener('dblclick', (e) => {
-        if(warrior.destination.y === undefined && warrior.destination.x === undefined) {
-            movableObjects.push(warrior.shoot(warrior.x, warrior.y, {x: e.clientX, y: e.clientY}));
+        if(warrior.destination.y === undefined && warrior.destination.x === undefined && warrior.hp > 0) {
+            movableObjects.push(warrior.shoot({x: e.clientX, y: e.clientY}));
         }
     });
 
     let warrior = new Unit({name: 'Archer', level:1, image:'units/archer', speed:2, x:330, y:149, team: 2});
     let enemies = [new Unit({name: 'Skeleton', level:1, image:'units/skeleton', speed:1.4, x:575, y:245})];
+
+    mapObjects.push(...[
+        new MapObject({x: 700, y: 225, image: 'terrain/pine-half04', hitbox: {x: 10, y: 54, w: 30, h: 25}}),
+        new MapObject({x: 1020, y: 240, image: 'terrain/pine-half04', hitbox: {x: 10, y: 54, w: 30, h: 25}}),
+        new MapObject({x: 140, y: 425, image: 'terrain/pine-half04', hitbox: {x: 10, y: 54, w: 30, h: 25}}),
+        new MapObject({x: 520, y: 120, image: 'terrain/pine-half04', hitbox: {x: 10, y: 54, w: 30, h: 25}}),
+        new MapObject({x: 870, y: 399, image: 'terrain/pine-half04', hitbox: {x: 10, y: 54, w: 30, h: 25}}),
+        ]
+    );
+
 
     window.main = () => {
         requestAnimationFrame(main);
@@ -31,7 +41,7 @@ window.onload = function() {
         enemies.forEach(enemy => {
             if(Math.random() > 0.87) {
                 enemy.destination = {x: Math.floor(Math.random() * canvas.width), y: Math.floor(Math.random() * canvas.height)}
-            } else if(Math.random() > 0.93) {
+            } else if(Math.random() > 0.91) {
                 enemy.destination = {x: warrior.x, y: warrior.y}
             }
         });
@@ -50,8 +60,19 @@ window.onload = function() {
                 level: 1,
                 image:'units/goblin',
                 speed: Math.random() + 1.95,
-                hp: 7,
+                max_hp: 7,
                 ws: 7,
+                x: Math.floor(Math.random() * canvas.width),
+                y:  Math.floor(Math.random() * canvas.height)
+            }))
+        } else if(Math.random() > 0.998 && warrior.hp > 0) {
+            enemies.push(new Unit({
+                name: 'Orc Warlord',
+                level: 13,
+                image:'units/orc_warlord',
+                speed: Math.random() + 2.15,
+                max_hp: 38,
+                ws: 19,
                 x: Math.floor(Math.random() * canvas.width),
                 y:  Math.floor(Math.random() * canvas.height)
             }))
@@ -61,8 +82,8 @@ window.onload = function() {
     main();
 };
 
-
 const movableObjects = [];
+const mapObjects = [];
 
 
 
@@ -71,9 +92,8 @@ const tick = (canvas, ctx, warrior, enemies, combatImg) => {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     movableObjects.forEach((arrow, i) => {
-        //console.log(arrow);
         arrow.move();
-        arrow.speed -= 0.05; // KUL!
+        arrow.speed -= 0.12; // KUL!
         ctx.drawImage(arrow.img, arrow.dir,0,32,32, arrow.x, arrow.y,32,32);
         // Griskod bara för kul test
         enemies.forEach(enemy => {
@@ -83,13 +103,26 @@ const tick = (canvas, ctx, warrior, enemies, combatImg) => {
                     warrior.killCount++;
                 }
                 movableObjects.splice(i, 1);
-            } else if(arrow.destination.y === undefined && arrow.destination.x === undefined || arrow.speed <3) {
+            } else if(arrow.destination.y === undefined && arrow.destination.x === undefined || arrow.speed <5) {
+                movableObjects.splice(i, 1);
+            }
+        });
+        mapObjects.forEach(mapObject => {
+            if(collisionDetection(arrow, mapObject)) {
                 movableObjects.splice(i, 1);
             }
         })
     });
 
-    [warrior, ...enemies].sort((a,  b) => a.y > b.y ? 1 : -1).forEach(unit => {
+    mapObjects.forEach(mapObject => {
+        ctx.drawImage(mapObject.img, mapObject.x, mapObject.y);
+    });
+
+    // Render all map object images
+    [warrior, ...enemies, ...mapObjects].sort((a,  b) => a.y + a.hitbox.y > b.y + b.hitbox.y ? 1 : -1).forEach(unit => {
+
+        const type = unit.constructor.name;
+
         if(unit.name !== 'Archer' && collisionDetection(unit, warrior) && unit.hp > 0 && warrior.hp > 0) {
             unit.fight(warrior);
             if(unit.hp <= 0) {
@@ -97,11 +130,15 @@ const tick = (canvas, ctx, warrior, enemies, combatImg) => {
             }
             ctx.drawImage(combatImg, unit.x, unit.y);
         } else if (unit.hp > 0) {
-            unit.move();
+            if(collisionDetection(unit, mapObjects)) {
+                unit.move(-1);
+            } else {
+                unit.move();
+            }
         }
 
         // Draw unit image
-        if(unit.hp <= 0) {
+        if(unit.hp <= 0 && type === 'Unit') {
             ctx.save();
             ctx.translate(unit.x, unit.y); // Todo ta hänsyn till hitbox eller något...
             ctx.rotate(90 * Math.PI / 180);
@@ -109,29 +146,30 @@ const tick = (canvas, ctx, warrior, enemies, combatImg) => {
             ctx.restore();
         } else {
             // Draw hp bar
-            ctx.beginPath();
-            ctx.moveTo(unit.x, unit.y);
-            ctx.lineTo(unit.x + 25, unit.y);
-            ctx.lineWidth = 5;
-            ctx.stroke();
-            ctx.strokeStyle = "#ae0008";
-            ctx.fill();
-            ctx.closePath();
+            if(type === 'Unit') {
+                ctx.beginPath();
+                ctx.moveTo(unit.x, unit.y);
+                ctx.lineTo(unit.x + 25, unit.y);
+                ctx.lineWidth = 5;
+                ctx.strokeStyle = "#2f3230";
+                ctx.stroke();
+                ctx.closePath();
 
-            ctx.beginPath();
-            ctx.moveTo(unit.x + 1 , unit.y );
-            ctx.lineTo(unit.x + unit.hp / unit.max_hp * 25 - 1,unit.y);
-            ctx.lineWidth = 3;
-            ctx.stroke();
-            ctx.strokeStyle = "#2f3230";
-            ctx.fill();
-            ctx.closePath();
+                ctx.beginPath();
+                ctx.moveTo(unit.x + 1, unit.y);
+                ctx.lineTo(unit.x + unit.hp / unit.max_hp * 25 - 1, unit.y);
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = "#ae0008";
+                ctx.stroke();
+                ctx.closePath();
 
+                // draw unit name and level
+                ctx.font = '9px sans-serif';
+                ctx.fillStyle = "#dddddd";
+                ctx.fillText(`${unit.name}[${unit.level}]`, unit.x, unit.y + unit.hitbox.h + 3);
+                ctx.closePath();
+            }
             ctx.drawImage(unit.img, unit.x, unit.y);
-            // draw unit name and level
-            ctx.font = '9px sans-serif';
-            ctx.fillStyle = "#dddddd";
-            ctx.fillText(`${unit.name}[${unit.level}]`, unit.x, unit.y + unit.hitbox.h + 3);
         }
     });
 
@@ -160,12 +198,21 @@ const tick = (canvas, ctx, warrior, enemies, combatImg) => {
 
 
 const collisionDetection = (object1, object2) => {
-    return (
-        object1.x + object1.hitbox.x < object2.x + object2.hitbox.x + object2.hitbox.w &&
-        object1.x + object1.hitbox.x + object1.hitbox.w > object2.x + object2.hitbox.x &&
-        object1.y + object1.hitbox.y < object2.y + object2.hitbox.y + object2.hitbox.h &&
-        object1.hitbox.h + object1.hitbox.y + object1.y > object2.y + object2.hitbox.y
-    )
+
+    let collision = false;
+
+    if(!Array.isArray(object2)) {
+        object2 = [object2]
+    }
+    object2.forEach(object => {
+        if (
+            object1.x + object1.hitbox.x < object.x + object.hitbox.x + object.hitbox.w &&
+            object1.x + object1.hitbox.x + object1.hitbox.w > object.x + object.hitbox.x &&
+            object1.y + object1.hitbox.y < object.y + object.hitbox.y + object.hitbox.h &&
+            object1.hitbox.h + object1.hitbox.y + object1.y > object.y + object.hitbox.y
+        ) { collision = true}
+    });
+    return collision;
 };
 
 // The most ancestral map object that everything descends from...
@@ -176,6 +223,22 @@ class MapObject {
         this.img = new Image();
         this.img.src = `public/src/images/${image}.png`; // Make something more extendable..
         this.hitbox = hitbox || {x: 0, w: (this.img.width || 1), y: 0, h: (this.img.height || 1)}; // Fungerar dåligt med sprites :D
+    }
+
+    drawHitbox(ctx) {
+        // test draw arrow hitbox
+        ctx.beginPath();
+
+        ctx.moveTo(this.x + this.hitbox.x, this.y + this.hitbox.y);
+        ctx.lineTo(this.x + this.hitbox.x + this.hitbox.w, this.y + this.hitbox.y);
+        ctx.lineTo(this.x + this.hitbox.x + this.hitbox.w, this.y + this.hitbox.y + this.hitbox.h);
+        ctx.lineTo(this. x + this.hitbox.x, this.y + this.hitbox.y + this.hitbox.h);
+        ctx.lineTo(this.x + this.hitbox.x, this.y + this.hitbox.y);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "#abe748";
+        ctx.stroke();
+
+        ctx.closePath();
     }
 }
 
@@ -188,14 +251,14 @@ class MovableObject extends MapObject {
 
     }
 
-    move () {
+    move (reverse = 1) {
         if(!this.destination.x || !this.destination.y || (this.destination.x === this.x && this.destination.y === this.y)) {
             return;
         }
 
 
-        const relX = this.destination.x - this.x;
-        const relY = this.destination.y - this.y;
+        const relX = reverse * this.destination.x - this.x;
+        const relY = reverse * this.destination.y - this.y;
 
         const hypotenuse = Math.sqrt(Math.pow(relX, 2) + Math.pow(relY,  2));
         const xDir = relX / hypotenuse;
@@ -246,16 +309,16 @@ class Unit extends MovableObject {
     }
 
     // Performing a shooting attack. Creates a new object with a direction, speed etc.
-    shoot = (x, y, destination) => {
-        const projectile = new MovableObject({speed: 8, destination, x, y, image: 'effects/arrow_sprite', hitbox : {x: 5, y: 5, w: 5, h: 5}});
+    shoot = (destination) => {
+        const projectile = new MovableObject({
+            speed: 12, destination, x: this.x, y: this.y, image: 'effects/arrow_sprite', hitbox : {x: 13, y: 13, w: 6, h: 6}
+        });
 
-        // 0-7 * 32 depending on direction :)
-        if(destination.x - x > 0) {
-            projectile.dir = 2
-        } else {
-            projectile.dir = 6;
-        }
-        projectile.dir *= 32;
+        const dirX = destination.x - this.x;
+        const dirY = destination.y - this.y;
+        const deg = Math.atan2(dirY, dirX) / Math.PI * 180 + 180;
+
+        projectile.dir = 32 * Math.round(deg / 45) % 256;
 
         return projectile;
     }
