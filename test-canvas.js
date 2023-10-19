@@ -35,14 +35,14 @@ window.onload = function () {
     if (
       warrior.destination.y === warrior.y &&
       warrior.destination.x === warrior.x &&
-      warrior.readyToShoot &&
+      warrior.attackReady &&
       warrior.hp > 0
     ) {
       movableObjects.push(warrior.shoot({ x: e.clientX, y: e.clientY }));
-      warrior.readyToShoot = false;
+      warrior.attackReady = false;
       setTimeout(() => {
-        warrior.readyToShoot = true;
-      }, 650);
+        warrior.attackReady = true;
+      }, warrior.attackRating);
     }
   });
 
@@ -88,6 +88,8 @@ window.onload = function () {
 
   let warrior = new Unit({
     name: "Archer",
+    max_hp: 15,
+    ws: 15,
     level: 1,
     image: "units/archer",
     speed: 2,
@@ -106,7 +108,7 @@ window.onload = function () {
     }),
   ];
 
-  let treeCount = Math.floor(Math.random() * 7) + 3;
+  let treeCount = Math.floor(Math.random() * 7) + 5;
 
   for (let i = 0; i < treeCount; i++) {
     const randomTree = terrain[Math.floor(Math.random() * terrain.length)];
@@ -125,28 +127,44 @@ window.onload = function () {
   };
 
   setInterval(() => {
-    enemies.forEach((enemy) => {
-      if (Math.random() > 0.85) {
-        enemy.destination = {
-          x: Math.floor(Math.random() * canvas.width),
-          y: Math.floor(Math.random() * canvas.height),
-        };
-      } else if (Math.random() > 0.82) {
-        enemy.destination = { x: warrior.x, y: warrior.y };
-      }
-    });
-    if (Math.random() > 0.96 && warrior.hp > 0) {
+    enemies
+      .filter((e) => e.hp > 0)
+      .forEach((enemy) => {
+        if (Math.random() > 0.85) {
+          enemy.destination = {
+            x: Math.floor(Math.random() * canvas.width),
+            y: Math.floor(Math.random() * canvas.height),
+          };
+        } else if (Math.random() > 0.82 && warrior.hp > 0) {
+          enemy.destination = { x: warrior.x, y: warrior.y };
+        } else if (
+          warrior.hp > 0 &&
+          enemy.isRanged &&
+          enemy.attackReady &&
+          Math.random() > 0.6
+        ) {
+          enemy.stop();
+          movableObjects.push(enemy.shoot({ x: warrior.x, y: warrior.y }));
+          enemy.attackReady = false;
+          setTimeout(() => {
+            enemy.attackReady = true;
+          }, enemy.attackRating);
+        }
+      });
+    if (Math.random() > 0.962 && warrior.hp > 0) {
       enemies.push(
         new Unit({
           name: "Skeleton",
           level: 2,
           image: "units/skeleton",
+          ws: 12,
           speed: Math.random() + 1.32,
           x: Math.floor(Math.random() * canvas.width),
           y: Math.floor(Math.random() * canvas.height),
+          attackRating: 1000,
         })
       );
-    } else if (Math.random() > 0.95 && warrior.hp > 0) {
+    } else if (Math.random() > 0.956 && warrior.hp > 0) {
       enemies.push(
         new Unit({
           name: "Goblin",
@@ -157,6 +175,7 @@ window.onload = function () {
           ws: 7,
           x: Math.floor(Math.random() * canvas.width),
           y: Math.floor(Math.random() * canvas.height),
+          attackRating: 800,
         })
       );
     } else if (Math.random() > 0.9823 && warrior.hp > 0) {
@@ -170,6 +189,20 @@ window.onload = function () {
           ws: 12,
           x: Math.floor(Math.random() * canvas.width),
           y: Math.floor(Math.random() * canvas.height),
+        })
+      );
+    } else if (Math.random() > 0.97 && warrior.hp > 0) {
+      enemies.push(
+        new Unit({
+          name: "Poacher",
+          level: 4,
+          image: "units/poacher",
+          speed: 1.25,
+          max_hp: 10,
+          ws: 6,
+          x: Math.floor(Math.random() * canvas.width),
+          y: Math.floor(Math.random() * canvas.height),
+          isRanged: true,
         })
       );
     } else if (Math.random() > 0.998 && warrior.hp > 0) {
@@ -202,20 +235,24 @@ const tick = (canvas, ctx, warrior, enemies, combatImg) => {
     ctx.drawImage(arrow.img, arrow.dir, 0, 32, 32, arrow.x, arrow.y, 32, 32);
 
     // Griskod bara för kul test
-    enemies.forEach((enemy) => {
-      if (collisionDetection(arrow, enemy) && enemy.hp > 0) {
-        enemy.hp -= Math.ceil(Math.random() * 4 + 1);
-        if (enemy.hp <= 0) {
-          warrior.killCount++;
+    [warrior, ...enemies]
+      .filter((u) => u.team !== arrow.team)
+      .forEach((target) => {
+        if (collisionDetection(arrow, target) && target.hp > 0) {
+          target.hp -= Math.ceil(Math.random() * 4 + 1);
+          if (target.hp <= 0 && arrow.team === 2) {
+            // Riktigt fult kodat!
+            warrior.killCount++;
+          }
+          movableObjects.splice(i, 1);
+        } else if (
+          (arrow.destination.y === arrow.y &&
+            arrow.destination.x === arrow.x) ||
+          arrow.speed < 5
+        ) {
+          movableObjects.splice(i, 1);
         }
-        movableObjects.splice(i, 1);
-      } else if (
-        (arrow.destination.y === arrow.y && arrow.destination.x === arrow.x) ||
-        arrow.speed < 5
-      ) {
-        movableObjects.splice(i, 1);
-      }
-    });
+      });
     mapObjects.forEach((mapObject) => {
       if (collisionDetection(arrow, mapObject)) {
         movableObjects.splice(i, 1);
@@ -233,32 +270,16 @@ const tick = (canvas, ctx, warrior, enemies, combatImg) => {
     .forEach((unit) => {
       const type = unit.constructor.name;
 
-      if (
-        unit.name !== "Archer" &&
-        collisionDetection(unit, warrior) &&
-        unit.hp > 0 &&
-        warrior.hp > 0
-      ) {
-        unit.fight(warrior);
-        if (unit.hp <= 0) {
-          warrior.killCount++;
-        }
-        ctx.drawImage(combatImg, unit.x, unit.y);
-      } else if (unit.hp > 0) {
-        if (collisionDetection(unit, mapObjects)) {
-          unit.move(-1);
-          unit.destination = { y: unit.y, x: unit.x };
-        } else {
-          unit.move();
-        }
-      }
-
       // Draw unit image
       if (unit.hp <= 0 && type === "Unit") {
         ctx.save();
-        ctx.translate(unit.x, unit.y); // Todo ta hänsyn till hitbox eller något...
+        ctx.translate(unit.x, unit.y);
         ctx.rotate((90 * Math.PI) / 180);
-        ctx.drawImage(unit.img, unit.hitbox.w / 2, unit.hitbox.h / 2);
+        ctx.drawImage(
+          unit.img,
+          -unit.img.width / 2 + unit.hitbox.w / 2,
+          -unit.img.height / 2 - unit.hitbox.h / 2
+        );
         ctx.restore();
       } else {
         // Draw hp bar
@@ -293,6 +314,40 @@ const tick = (canvas, ctx, warrior, enemies, combatImg) => {
           ctx.closePath();
         }
       }
+
+      if (
+        unit.name !== "Archer" &&
+        collisionDetection(unit, warrior) &&
+        unit.hp > 0 &&
+        warrior.hp > 0
+      ) {
+        // Order of initiative
+        if (Math.random() > 0.5) {
+          unit.fight(warrior);
+          warrior.fight(unit);
+        } else {
+          warrior.fight(unit);
+          unit.fight(warrior);
+        }
+        unit.stop();
+        warrior.stop();
+
+        if (unit.hp <= 0) {
+          warrior.killCount++;
+        }
+        ctx.drawImage(
+          combatImg,
+          (unit.x + warrior.x) / 2,
+          (unit.y + warrior.y) / 2
+        );
+      } else if (unit.hp > 0) {
+        if (collisionDetection(unit, mapObjects)) {
+          unit.move(-1);
+          unit.stop();
+        } else {
+          unit.move();
+        }
+      }
     });
 
   ctx.beginPath();
@@ -304,7 +359,7 @@ const tick = (canvas, ctx, warrior, enemies, combatImg) => {
   // Draw the game info
   ctx.font = "18px sans-serif";
   ctx.fillStyle = "#F3F4F6";
-  ctx.fillText(`🏹 Exceptional Archer v0.2`, 20, 28);
+  ctx.fillText(`🏹 Exceptional Archer v0.3`, 20, 28);
   ctx.font = "12px sans-serif";
   ctx.fillText(`Enemies slain: ${warrior.killCount}`, 20, 48);
   ctx.fillText(`Right-click to shoot (must stand still)`, 20, 66);
@@ -374,10 +429,11 @@ class MapObject {
 }
 
 class MovableObject extends MapObject {
-  constructor({ speed, destination, x, y, hitbox, image }) {
+  constructor({ speed, destination, x, y, hitbox, image, team }) {
     super({ x, y, hitbox, image });
     this.speed = speed || 1;
     this.destination = destination || { x, y };
+    this.team = team ?? 0; // Can't damage units with same team
   }
 
   move(reverse = 1) {
@@ -427,7 +483,9 @@ class Unit extends MovableObject {
     team,
     max_hp,
     ws,
-    readyToShoot,
+    attackRating,
+    attackReady,
+    isRanged,
   }) {
     super({ x, y, speed, hitbox, destination, image });
     this.name = name;
@@ -439,14 +497,21 @@ class Unit extends MovableObject {
     this.hitbox = { x: 5, w: 24, y: 0, h: 32 }; // top-left x,y bottom-right x,y
     this.destination = { x, y };
     this.killCount = 0;
-    this.readyToShoot = readyToShoot ?? true;
+    this.attackRating = attackRating ?? 650;
+    this.attackReady = attackReady ?? true;
+    this.isRanged = isRanged ?? false; // Can perform shooting attacks
   }
 
   fight(target) {
+    if (!this.attackReady || this.hp <= 0) {
+      return;
+    }
     if (Math.random() * this.ws > Math.random() * target.ws) {
-      target.hp -= 1;
-    } else {
-      this.hp -= 1;
+      target.hp -= 2;
+      this.attackReady = false;
+      setTimeout(() => {
+        this.attackReady = true;
+      }, this.attackRating);
     }
   }
 
@@ -459,6 +524,7 @@ class Unit extends MovableObject {
       y: this.y,
       image: "effects/arrow_sprite",
       hitbox: { x: 13, y: 13, w: 6, h: 6 },
+      team: this.team,
     });
 
     const dirX = destination.x - this.x;
@@ -468,5 +534,9 @@ class Unit extends MovableObject {
     projectile.dir = (32 * Math.round(deg / 45)) % 256;
 
     return projectile;
+  };
+
+  stop = () => {
+    this.destination = { y: this.y, x: this.x };
   };
 }
