@@ -22,6 +22,10 @@ const terrain = [
 ];
 
 window.onload = function () {
+  let background = document.getElementById("background");
+  background.height = window.innerHeight - 10;
+  background.width = document.body.clientWidth - 5;
+
   let canvas = document.getElementById("myCanvas");
   let ctx = canvas.getContext("2d");
   canvas.height = window.innerHeight - 10;
@@ -42,7 +46,7 @@ window.onload = function () {
       warrior.attackReady = false;
       setTimeout(() => {
         warrior.attackReady = true;
-      }, warrior.attackRating);
+      }, Math.round(1000 / warrior.attackRating));
     }
   });
 
@@ -93,20 +97,12 @@ window.onload = function () {
     level: 1,
     image: "units/archer",
     speed: 2,
+    attackRating: 1,
     x: 330,
     y: 149,
     team: 2,
   });
-  let enemies = [
-    new Unit({
-      name: "Skeleton",
-      level: 1,
-      image: "units/skeleton",
-      speed: 1.4,
-      x: 575,
-      y: 245,
-    }),
-  ];
+  let enemies = [];
 
   let treeCount = Math.floor(Math.random() * 7) + 5;
 
@@ -148,76 +144,99 @@ window.onload = function () {
           enemy.attackReady = false;
           setTimeout(() => {
             enemy.attackReady = true;
-          }, enemy.attackRating);
+          }, Math.round(1000 / enemy.attackRating));
         }
       });
-    if (Math.random() > 0.962 && warrior.hp > 0) {
-      enemies.push(
-        new Unit({
-          name: "Skeleton",
-          level: 2,
-          image: "units/skeleton",
-          ws: 12,
-          speed: Math.random() + 1.32,
-          x: Math.floor(Math.random() * canvas.width),
-          y: Math.floor(Math.random() * canvas.height),
-          attackRating: 1000,
-        })
-      );
-    } else if (Math.random() > 0.956 && warrior.hp > 0) {
-      enemies.push(
-        new Unit({
-          name: "Goblin",
-          level: 1,
-          image: "units/goblin",
-          speed: Math.random() + 1.99,
-          max_hp: 7,
-          ws: 7,
-          x: Math.floor(Math.random() * canvas.width),
-          y: Math.floor(Math.random() * canvas.height),
-          attackRating: 800,
-        })
-      );
-    } else if (Math.random() > 0.9823 && warrior.hp > 0) {
-      enemies.push(
-        new Unit({
-          name: "Orc",
-          level: 3,
-          image: "units/orc",
-          speed: Math.random() * 1.25 + 1.25,
-          max_hp: 14,
-          ws: 12,
-          x: Math.floor(Math.random() * canvas.width),
-          y: Math.floor(Math.random() * canvas.height),
-        })
-      );
-    } else if (Math.random() > 0.97 && warrior.hp > 0) {
-      enemies.push(
-        new Unit({
-          name: "Poacher",
-          level: 4,
-          image: "units/poacher",
-          speed: 1.25,
-          max_hp: 10,
-          ws: 6,
-          x: Math.floor(Math.random() * canvas.width),
-          y: Math.floor(Math.random() * canvas.height),
-          isRanged: true,
-        })
-      );
-    } else if (Math.random() > 0.998 && warrior.hp > 0) {
-      enemies.push(
-        new Unit({
-          name: "Orc Warlord",
-          level: 14,
-          image: "units/orc_warlord",
-          speed: Math.random() + 2.15,
-          max_hp: 38,
-          ws: 19,
-          x: Math.floor(Math.random() * canvas.width),
-          y: Math.floor(Math.random() * canvas.height),
-        })
-      );
+
+    const difficultyRaise = warrior.level * 0.01;
+
+    if (enemies.filter((e) => e.hp > 0).length < 20) {
+      if (Math.random() > 0.97 - difficultyRaise && warrior.hp > 0) {
+        enemies.push(
+          new Unit({
+            name: "Skeleton",
+            level: 2,
+            image: "units/skeleton",
+            ws: 12,
+            max_hp: 9,
+            speed: Math.random() + 1.32,
+            x: Math.floor(Math.random() * canvas.width),
+            y: Math.floor(Math.random() * canvas.height),
+            attackRating: 0.8,
+          })
+        );
+      } else if (Math.random() > 0.96 - difficultyRaise && warrior.hp > 0) {
+        enemies.push(
+          new Unit({
+            name: "Goblin",
+            level: 1,
+            image: "units/goblin",
+            speed: Math.random() + 1.99,
+            max_hp: 6,
+            ws: 7,
+            x: Math.floor(Math.random() * canvas.width),
+            y: Math.floor(Math.random() * canvas.height),
+            attackRating: 0.95,
+          })
+        );
+      } else if (Math.random() > 0.99 - difficultyRaise && warrior.hp > 0) {
+        enemies.push(
+          new Unit({
+            name: "Orc",
+            level: 3,
+            image: "units/orc",
+            speed: 1.5 + Math.floor(Math.random() * 0.25),
+            max_hp: 12,
+            ws: 14,
+            attackRating: 1.25,
+            x: Math.floor(Math.random() * canvas.width),
+            y: Math.floor(Math.random() * canvas.height),
+          })
+        );
+      } else if (Math.random() > 0.98 - difficultyRaise && warrior.hp > 0) {
+        enemies.push(
+          new Unit({
+            name: "Poacher",
+            level: 4,
+            image: "units/poacher",
+            speed: 1.25,
+            max_hp: 7,
+            ws: 10,
+            x: Math.floor(Math.random() * canvas.width),
+            y: Math.floor(Math.random() * canvas.height),
+            isRanged: true,
+            attackRating: 0.4,
+          })
+        );
+      } else if (Math.random() > 1 - difficultyRaise / 10 && warrior.hp > 0) {
+        enemies.push(
+          new Unit({
+            name: "Orc Warlord",
+            level: 10,
+            image: "units/orc_warlord",
+            speed: Math.random() + 1.75,
+            max_hp: 22,
+            ws: 20,
+            attackRating: 1.78,
+            x: Math.floor(Math.random() * canvas.width),
+            y: Math.floor(Math.random() * canvas.height),
+          })
+        );
+      } else if (Math.random() > 1.03 - difficultyRaise && warrior.hp > 0) {
+        enemies.push(
+          new Unit({
+            name: "Wolf",
+            level: 3,
+            image: "units/wolf",
+            speed: Math.random() + 2.3,
+            max_hp: 6,
+            ws: 9,
+            attackRating: 1.58,
+            x: Math.floor(Math.random() * canvas.width),
+            y: Math.floor(Math.random() * canvas.height),
+          })
+        );
+      }
     }
   }, 500);
 
@@ -242,7 +261,7 @@ const tick = (canvas, ctx, warrior, enemies, combatImg) => {
           target.hp -= Math.ceil(Math.random() * 4 + 1);
           if (target.hp <= 0 && arrow.team === 2) {
             // Riktigt fult kodat!
-            warrior.killCount++;
+            warrior.kill(target);
           }
           movableObjects.splice(i, 1);
         } else if (
@@ -333,7 +352,7 @@ const tick = (canvas, ctx, warrior, enemies, combatImg) => {
         warrior.stop();
 
         if (unit.hp <= 0) {
-          warrior.killCount++;
+          warrior.kill(unit);
         }
         ctx.drawImage(
           combatImg,
@@ -354,19 +373,20 @@ const tick = (canvas, ctx, warrior, enemies, combatImg) => {
 
   // Draw a gray box
   ctx.fillStyle = "rgba(0,0,20,0.8)";
-  ctx.fillRect(0, 0, 260, 120);
+  ctx.fillRect(0, 0, 260, 125);
 
   // Draw the game info
   ctx.font = "18px sans-serif";
   ctx.fillStyle = "#F3F4F6";
-  ctx.fillText(`🏹 Exceptional Archer v0.3`, 20, 28);
+  ctx.fillText(`🏹 Exceptional Archer v0.4`, 20, 28);
   ctx.font = "12px sans-serif";
   ctx.fillText(`Enemies slain: ${warrior.killCount}`, 20, 48);
-  ctx.fillText(`Right-click to shoot (must stand still)`, 20, 66);
-  ctx.fillText(`Move around with WASD`, 20, 80);
+  ctx.fillText(`Level ${warrior.level} | XP: ${warrior.xp} / ${100}`, 20, 62);
+  ctx.fillText(`Right-click to shoot (must stand still)`, 20, 80);
+  ctx.fillText(`Move around with WASD`, 20, 96);
 
   if (warrior.hp <= 0) {
-    ctx.fillText(`You have died. Reload to start over again...`, 20, 100);
+    ctx.fillText(`You have died. Reload to start over again...`, 20, 112);
   }
 };
 
@@ -490,6 +510,7 @@ class Unit extends MovableObject {
     super({ x, y, speed, hitbox, destination, image });
     this.name = name;
     this.level = level || 1;
+    this.xp = 0;
     this.hp = max_hp || 10;
     this.max_hp = max_hp || 10;
     this.ws = ws || 10; // Weapon Skill
@@ -497,7 +518,7 @@ class Unit extends MovableObject {
     this.hitbox = { x: 5, w: 24, y: 0, h: 32 }; // top-left x,y bottom-right x,y
     this.destination = { x, y };
     this.killCount = 0;
-    this.attackRating = attackRating ?? 650;
+    this.attackRating = attackRating ?? 1; // Attacks per second
     this.attackReady = attackReady ?? true;
     this.isRanged = isRanged ?? false; // Can perform shooting attacks
   }
@@ -511,7 +532,7 @@ class Unit extends MovableObject {
       this.attackReady = false;
       setTimeout(() => {
         this.attackReady = true;
-      }, this.attackRating);
+      }, Math.round(1000 / this.attackRating));
     }
   }
 
@@ -538,5 +559,21 @@ class Unit extends MovableObject {
 
   stop = () => {
     this.destination = { y: this.y, x: this.x };
+  };
+
+  kill = (target) => {
+    this.killCount++;
+    this.xp += Math.round((target.level + 2) / (this.level + 1)) * 10 ?? 5;
+
+    // Basic level up
+    if (this.xp >= 100) {
+      this.xp -= 100;
+      this.level++;
+      this.max_hp += 2;
+      this.hp = this.max_hp;
+      this.ws += 3;
+      this.speed += 0.1;
+      this.attackRating += 0.1;
+    }
   };
 }
